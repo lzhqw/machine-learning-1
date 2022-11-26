@@ -75,5 +75,5 @@ class KMeans:
         plt.scatter(self.x[:,0],self.x[:,1])
         plt.scatter(self.meanVectors[:,0],self.meanVectors[:,1],s=20,c='r')
         # plt.show()
-        plt.savefig('iteration_{}.png'.format(iteration))
+        plt.savefig('kmeans_{}.png'.format(iteration))
         plt.close()

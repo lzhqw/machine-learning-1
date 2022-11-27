@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import graphviz as gz
+import copy
 
 
 class Node:
@@ -9,23 +10,103 @@ class Node:
         self.class_ = class_
         self.type = type
         self.attr = attr
+        self.class_dict = {}
+    def copy(self, node):
+        node.children = self.children
+        node.class_ = self.class_
+        node.type = self.type
+        node.attr = self.attr
+        node.class_dict = self.class_dict
+
 
 class Decision_Tree:
-    def __init__(self, data, A, plot=True):
+    def __init__(self, data, val, A, plot=True):
         self.data = data
+        self.val = val
         self.attr_num = {}
         self.plot = plot
         self.class_ = self.countClass(self.data).keys()
+        self.node = None
         for i in range(len(A)):
             self.attr_num[A[i]]=i
-    def train(self, D, A, attr=None):
-        node = self.TreeGenerate(D,A,attr=attr)
+
+    def train(self):
+        node = self.TreeGenerate(self.data,list(self.attr_num.keys()),attr=None)
+        self.node = node
         if self.plot:
             graph = gz.Graph()
             self.draw_DT(graph, node, 0)
             graph.view()
 
-    def TreeGenerate(self, D, A, attr=None):
+    def predict_node(self, node, x):
+        class_ = node.class_
+        # print(node.class_,node.children)
+        if len(node.children)==0:
+            return node.class_
+        for child in node.children:
+            if child.attr == x[self.attr_num[class_]]:
+                class_ = self.predict_node(child,x)
+                return class_
+    def predict(self, x):
+        class_ = self.predict_node(self.node, x)
+        return class_
+
+    def accuracy(self):
+        cnt = 0
+        for i in range(len(self.val)):
+            if self.predict(self.val[i,:-1]) == self.val[i,-1]:
+                cnt+=1
+        return cnt/len(self.val)
+
+    def postPruning(self):
+        divideList = self.getDivideNode(self.node,0)
+        print(divideList)
+        while len(divideList)>0:
+            depth = 0
+            index = 0
+            for i in range(len(divideList)):
+                if divideList[i][1]>depth:
+                    depth = divideList[i][1]
+                    index = i
+            acc1 = self.accuracy()
+            node = divideList[index][0]
+            node_copy = Node()
+            node.copy(node_copy)
+            # ---------------------------------------------------- #
+            # 剪枝
+            # ---------------------------------------------------- #
+            node.type = 'leaf'
+            class_dict = node.class_dict
+            class_ = max(class_dict, key=class_dict.get)
+            node.class_ = class_
+            node.children = []
+            # ---------------------------------------------------- #
+            # 比较剪枝前后的准确率,如果效果没有变好，则恢复
+            # ---------------------------------------------------- #
+            acc2 = self.accuracy()
+            if acc2 <= acc1:
+                node_copy.copy(node)
+                print(f'acc:{acc1},不剪枝,节点信息：字段 {node.attr},深度 {divideList[index][1]}')
+            else:
+                print(f'acc:{acc2},剪枝,节点信息：字段 {node.attr},深度 {divideList[index][1]}')
+            divideList.pop(index)
+        graph = gz.Graph()
+        self.draw_DT(graph,self.node,0)
+        graph.view()
+        return self.node
+
+
+    def getDivideNode(self, node, depth):
+        devideNodeList = []
+        if len(node.children)>0:
+            for child in node.children:
+                devideNodeList.extend(self.getDivideNode(child, depth+1))
+        if node.type == 'divide':
+            devideNodeList.append((node,depth))
+            return devideNodeList
+        return devideNodeList
+
+    def TreeGenerate(self, D, A, attr):
         node = Node()
         node.attr = attr
         # ---------------------------------------------------- #
@@ -44,6 +125,7 @@ class Decision_Tree:
             class_ = max(count, key=count.get)
             node.class_ = class_
             return node
+        node.class_dict = self.countClass(D)
         # ---------------------------------------------------- #
         # 计算样本D上的信息熵
         # ---------------------------------------------------- #
@@ -65,7 +147,7 @@ class Decision_Tree:
         # ---------------------------------------------------- #
         # 设置node的属性（分类节点，按照什么属性分类）
         # ---------------------------------------------------- #
-        node.type = 'devide'
+        node.type = 'divide'
         node.class_ = best_attr[0]
         # ---------------------------------------------------- #
         # 对于分类属性的每一个类，判断是否为空
@@ -146,6 +228,7 @@ class Decision_Tree:
         :param x: ndarray
         :return: 信息熵
         '''
+        x[np.where(x==0)] = 1
         return -np.sum(x*np.log2(x))
 
     def CE(self, D, attr_idx):
@@ -193,27 +276,3 @@ class Decision_Tree:
                 nodeid = self.draw_DT(graph, child, child_id)
                 graph.edge(str(curr_nodeid), str(child_id), label=child.attr, fontname='FangSong')
         return nodeid
-
-# def draw_DT(graph,node,nodeid):
-#     '''
-#     通过graphviz进行决策树可视化（递归）
-#     :param graph: 图
-#     :param node: 上一级节点（决策树的节点）
-#     :param nodeid: 上一级节点编号（graph的节点编号）
-#     :return: nodeid
-#     '''
-#     if node.class_ == '是':
-#         graph.node(str(nodeid), '好瓜', fontname='SimSun')
-#     elif node.class_ == '否':
-#         graph.node(str(nodeid), '坏瓜', fontname='SimSun')
-#     else:
-#         graph.node(str(nodeid),node.class_+'=?',fontname='SimSun')
-#     curr_nodeid = nodeid
-#     # print(node.class_,nodeid)
-#     if node.children:
-#         for child in node.children:
-#             child_id = nodeid+1
-#             nodeid = draw_DT(graph,child,child_id)
-#             graph.edge(str(curr_nodeid),str(child_id),label=child.attr,fontname='FangSong')
-#     return nodeid
-

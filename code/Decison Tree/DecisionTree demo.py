@@ -7,9 +7,9 @@ data = pd.read_csv('watermalen.txt')
 print(data)
 attrs = list(data.columns)[1:-1]
 data = data.iloc[:, 1:].to_numpy()
-print(data)
-dt = Decision_Tree(data, attrs)
-node = dt.train(data, attrs)
-# graph = gz.Graph()
-# draw_DT(graph,node,0)
-# graph.view()
+dt = Decision_Tree(data[[0,1,2,5,6,9,13,14,15,16],:],
+                   data[[3,4,7,8,10,11,12],:], attrs,plot=False)
+
+node = dt.train()
+dt.postPruning()
+dt.predict(['乌黑', '稍蜷', '浊响', '清晰', '凹陷', '硬滑'])

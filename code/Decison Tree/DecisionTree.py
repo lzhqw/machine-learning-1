@@ -1,22 +1,25 @@
 import pandas as pd
 import numpy as np
 import graphviz as gz
-import copy
 
 
 class Node:
-    def __init__(self, class_=None, type=None, attr=None):
-        self.children = []
-        self.class_ = class_
-        self.type = type
-        self.attr = attr
-        self.class_dict = {}
+    def __init__(self, class_=None, type=None, attr=None, attr_name=None):
+        self.children = []          # 子节点
+        self.class_ = class_        # 叶节点类别
+        self.type = type            # 节点类型
+        self.attr = attr            # 父节点到该节点的属性
+        self.class_dict = {}        # 节点类别字典
+        self.attrName = attr_name
     def copy(self, node):
         node.children = self.children
         node.class_ = self.class_
         node.type = self.type
         node.attr = self.attr
         node.class_dict = self.class_dict
+        node.attrName = self.attrName
+    def print(self):
+        print(self.class_,self.class_dict,self.attrName,self.type,self.children)
 
 
 class Decision_Tree:
@@ -25,26 +28,33 @@ class Decision_Tree:
         self.val = val
         self.attr_num = {}
         self.plot = plot
-        self.class_ = self.countClass(self.data).keys()
         self.node = None
         for i in range(len(A)):
             self.attr_num[A[i]]=i
 
-    def train(self):
-        node = self.TreeGenerate(self.data,list(self.attr_num.keys()),attr=None)
-        self.node = node
+    def train(self, prune = None):
+        if prune is None:
+            self.node = self.TreeGenerate(self.data,list(self.attr_num.keys()),
+                                          attr=None,root=True)
+        elif prune == 'post':
+            self.node = self.TreeGenerate(self.data,list(self.attr_num.keys()),
+                                          attr=None,root=True)
+            self.postPruning()
+        elif prune == 'pre':
+            self.node = self.TreeGenerate(self.data,list(self.attr_num.keys()),
+                                          attr=None,root=True,pre=True)
+
         if self.plot:
             graph = gz.Graph()
-            self.draw_DT(graph, node, 0)
+            self.draw_DT(graph, self.node, 0)
             graph.view()
 
     def predict_node(self, node, x):
-        class_ = node.class_
-        # print(node.class_,node.children)
+        attrName = node.attrName
         if len(node.children)==0:
             return node.class_
         for child in node.children:
-            if child.attr == x[self.attr_num[class_]]:
+            if child.attr == x[self.attr_num[attrName]]:
                 class_ = self.predict_node(child,x)
                 return class_
     def predict(self, x):
@@ -90,9 +100,9 @@ class Decision_Tree:
             else:
                 print(f'acc:{acc2},剪枝,节点信息：字段 {node.attr},深度 {divideList[index][1]}')
             divideList.pop(index)
-        graph = gz.Graph()
-        self.draw_DT(graph,self.node,0)
-        graph.view()
+        # graph = gz.Graph()
+        # self.draw_DT(graph,self.node,0)
+        # graph.view()
         return self.node
 
 
@@ -106,8 +116,10 @@ class Decision_Tree:
             return devideNodeList
         return devideNodeList
 
-    def TreeGenerate(self, D, A, attr):
+    def TreeGenerate(self, D, A, attr, root, pre=False):
         node = Node()
+        if root:
+            self.node = node
         node.attr = attr
         # ---------------------------------------------------- #
         # 判断是否都是同一个类，如果都是同一个类，分类完成，return
@@ -125,6 +137,10 @@ class Decision_Tree:
             class_ = max(count, key=count.get)
             node.class_ = class_
             return node
+        # ---------------------------------------------------- #
+        # 计算类别的分布 用于后剪枝的时候判断divide节点
+        # 变成叶节点的时候应该归属到哪一个类
+        # ---------------------------------------------------- #
         node.class_dict = self.countClass(D)
         # ---------------------------------------------------- #
         # 计算样本D上的信息熵
@@ -148,11 +164,34 @@ class Decision_Tree:
         # 设置node的属性（分类节点，按照什么属性分类）
         # ---------------------------------------------------- #
         node.type = 'divide'
-        node.class_ = best_attr[0]
+        node.attrName = best_attr[0]
         # ---------------------------------------------------- #
         # 对于分类属性的每一个类，判断是否为空
         # 如果为空则新分支标记为D中最多的类，否则重复上述步骤
         # ---------------------------------------------------- #
+        ifContinue = True
+        if pre:
+            ifContinue = self.prePruning(node,attr_dict,best_attr,D)
+        if ifContinue:
+            for attr in attr_dict.keys():
+                if attr_dict[attr] == 0:
+                    count = self.countClass(D)
+                    class_ = max(count, key=count.get)
+                    node.children.append(Node(class_=class_,type='leaf',attr=attr))
+                else:
+                    Dv = D[np.where(D[:,self.attr_num[best_attr[0]]]==attr),:][0]
+                    A2 = A.copy()
+                    A2.remove(best_attr[0])
+                    print(best_attr[0],attr)
+                    print(A2)
+                    print('# ---------------------------------------------------- #')
+                    node.children.append(self.TreeGenerate(Dv,A2,attr,False))
+        return node
+
+    def prePruning(self, node, attr_dict, best_attr, D):
+        if node.class_ is None:
+            node.class_ = max(node.class_dict, key=node.class_dict.get)
+        acc1 = self.accuracy()
         for attr in attr_dict.keys():
             if attr_dict[attr] == 0:
                 count = self.countClass(D)
@@ -160,13 +199,16 @@ class Decision_Tree:
                 node.children.append(Node(class_=class_,type='leaf',attr=attr))
             else:
                 Dv = D[np.where(D[:,self.attr_num[best_attr[0]]]==attr),:][0]
-                A2 = A.copy()
-                A2.remove(best_attr[0])
-                print(best_attr[0],attr)
-                print(A2)
-                print('# ---------------------------------------------------- #')
-                node.children.append(self.TreeGenerate(Dv,A2,attr))
-        return node
+                class_dict = self.countClass(Dv)
+                class_ = max(class_dict, key=class_dict.get)
+                child = Node(type='leaf',class_=class_)
+                node.children.append(child)
+        acc2 = self.accuracy()
+        node.children = []
+        if acc2>acc1:
+            return True
+        else:
+            return False
 
     def isSame(self, D):
         '''
@@ -264,10 +306,10 @@ class Decision_Tree:
             :param nodeid: 上一级节点编号（graph的节点编号）
             :return: nodeid
             '''
-        if node.class_ in self.class_:
+        if len(node.children)==0:
             graph.node(str(nodeid), node.class_, fontname='SimSun')
         else:
-            graph.node(str(nodeid), node.class_ + '=?', fontname='SimSun')
+            graph.node(str(nodeid), node.attrName + '=?', fontname='SimSun')
         curr_nodeid = nodeid
         # print(node.class_,nodeid)
         if node.children:

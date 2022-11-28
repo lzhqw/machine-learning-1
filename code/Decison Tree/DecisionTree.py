@@ -28,7 +28,7 @@ class Decision_Tree:
         self.val = val
         self.attr_num = {}
         self.plot = plot
-        self.node = None
+        self.node = Node()
         for i in range(len(A)):
             self.attr_num[A[i]]=i
 
@@ -119,7 +119,7 @@ class Decision_Tree:
     def TreeGenerate(self, D, A, attr, root, pre=False):
         node = Node()
         if root:
-            self.node = node
+            self.node=node
         node.attr = attr
         # ---------------------------------------------------- #
         # 判断是否都是同一个类，如果都是同一个类，分类完成，return
@@ -185,7 +185,7 @@ class Decision_Tree:
                     print(best_attr[0],attr)
                     print(A2)
                     print('# ---------------------------------------------------- #')
-                    node.children.append(self.TreeGenerate(Dv,A2,attr,False))
+                    node.children.append(self.TreeGenerate(Dv,A2,attr,False,pre=pre))
         return node
 
     def prePruning(self, node, attr_dict, best_attr, D):
@@ -201,13 +201,18 @@ class Decision_Tree:
                 Dv = D[np.where(D[:,self.attr_num[best_attr[0]]]==attr),:][0]
                 class_dict = self.countClass(Dv)
                 class_ = max(class_dict, key=class_dict.get)
-                child = Node(type='leaf',class_=class_)
+                child = Node(type='leaf',class_=class_,attr=attr)
                 node.children.append(child)
+        # graph = gz.Graph()
+        # self.draw_DT(graph, self.node, 0)
+        # graph.view()
         acc2 = self.accuracy()
         node.children = []
         if acc2>acc1:
+            print(f'划分前：{acc1}，划分后：{acc2}，继续划分')
             return True
         else:
+            print(f'划分前：{acc1}，划分后：{acc2}，禁止划分')
             return False
 
     def isSame(self, D):
@@ -310,6 +315,7 @@ class Decision_Tree:
             graph.node(str(nodeid), node.class_, fontname='SimSun')
         else:
             graph.node(str(nodeid), node.attrName + '=?', fontname='SimSun')
+        node.print()
         curr_nodeid = nodeid
         # print(node.class_,nodeid)
         if node.children:

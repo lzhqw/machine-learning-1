@@ -5,6 +5,8 @@ from DecisionTree import Decision_Tree
 
 data = pd.read_csv('watermalen.txt')
 print(data)
+data = data.loc[:,['编号','脐部', '色泽', '根蒂', '敲声', '纹理', '触感','好瓜']]
+print(data)
 attrs = list(data.columns)[1:-1]
 data = data.iloc[:, 1:].to_numpy()
 dt = Decision_Tree(data[[0,1,2,5,6,9,13,14,15,16],:],

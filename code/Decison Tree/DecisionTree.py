@@ -312,9 +312,12 @@ class Decision_Tree:
             :return: nodeid
             '''
         if len(node.children)==0:
-            graph.node(str(nodeid), node.class_, fontname='SimSun')
+            graph.node(str(nodeid), node.class_, fontname='SimSun',
+                       style='filled',color='black',fillcolor='#78C25E')
         else:
-            graph.node(str(nodeid), node.attrName + '=?', fontname='SimSun')
+            graph.node(str(nodeid), node.attrName + '=?',
+                       fontname='SimSun',shape='box',
+                       style='filled',color='black',fillcolor='#FFD588')
         node.print()
         curr_nodeid = nodeid
         # print(node.class_,nodeid)

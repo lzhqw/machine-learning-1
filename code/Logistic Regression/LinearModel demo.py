@@ -15,6 +15,7 @@ lg = LogisticRegression(X,y,lr=10)
 lg.train()
 # 计算精度
 acc = lg.acc(X,y)
+print(acc)
 # 绘制决策边界
 lg.plot_decision_boundaries()
 # 绘制loss
